@@ -1,3 +1,4 @@
+import io
 import argparse
 import datetime as dt
 import json
@@ -7,6 +8,7 @@ from matplotlib.figure import Figure
 from matplotlib.dates import DateFormatter, HourLocator
 from matplotlib.ticker import MultipleLocator
 from zoneinfo import ZoneInfo
+from PIL import Image
 
 import requests
 
@@ -109,14 +111,16 @@ def plot(
     tz: ZoneInfo,
 ) -> Path:
     dpi = 200
-    fig = Figure(figsize=(width / dpi, height / dpi), dpi=dpi, layout="constrained")
+    fig = Figure(figsize=(width / dpi, height / dpi), dpi=dpi, layout="compressed")
+    engine = fig.get_layout_engine()
+    engine.set(w_pad=0, h_pad=0, wspace=0, hspace=0)
     NUM_ROW = 2
     NUM_COL = 1
 
     def sub_plot(idx: int, color: str, data: list[float], lo: float, hi: float):
         ax = fig.add_subplot(NUM_ROW, NUM_COL, idx)
         ax.set_ylim(lo, hi)
-        ax.set_xlim(weather.time[0], weather.time[-1])
+        ax.set_xlim(weather.time[0], weather.time[-1])  # ty: ignore[invalid-argument-type]
         ax.fill_between(
             x=weather.time,  # ty: ignore[invalid-argument-type]
             y1=lo,
@@ -135,8 +139,14 @@ def plot(
             .astimezone(tz=tz)
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
-        while midnight < weather.time[-1]:
-            ax.axvline(midnight, color="black", linestyle=(0, (1, 10)), linewidth=1.0)
+        while midnight <= weather.time[-1]:
+            if midnight >= weather.time[0]:
+                ax.axvline(
+                    midnight,  # ty: ignore[invalid-argument-type]
+                    color="black",
+                    linestyle=":",
+                    linewidth=0.9,
+                )
             midnight += dt.timedelta(hours=24)
 
         if idx == 1:  # on top
@@ -146,13 +156,14 @@ def plot(
                 .astimezone(tz=tz)
                 .replace(hour=12, minute=0, second=0, microsecond=0)
             )
-            while noon < weather.time[-1]:
-                if noon > weather.time[0]:
+            while noon <= weather.time[-1]:
+                if noon >= weather.time[0]:
                     ax.text(
-                        x=noon,
-                        y=lo - (hi - lo) * 0.12,
+                        x=noon,  # ty: ignore[invalid-argument-type]
+                        y=lo - (hi - lo) * 0.08,
                         s=noon.strftime("%a"),
                         horizontalalignment="center",
+                        fontsize=9,
                     )
                 noon += dt.timedelta(hours=24)
 
@@ -164,7 +175,7 @@ def plot(
             linewidth=0.5,
             color="black",
         )
-        ax.tick_params(axis="both", which="major", labelsize=8)
+        ax.tick_params(axis="both", which="major", labelsize=7)
 
         if idx != NUM_ROW:
             # remove x axis for all but the bottom plot
@@ -174,20 +185,20 @@ def plot(
         else:
             ax.xaxis.set_major_locator(HourLocator(byhour=[0, 6, 12, 18], tz=tz))
             ax.xaxis.set_major_formatter(DateFormatter("%H", tz=tz))
-            generated = weather.generation_time.astimezone(tz=tz).strftime("%a %H:%M")
-            ax.set_xlabel(f"forecast {generated}", fontsize=4, loc="right")
+
+            # TODO: find a spot for this. Was taking up too much space as an xlabel
+            # generated = weather.generation_time.astimezone(tz=tz).strftime("%a %H:%M")
+            # ax.set_xlabel(f"forecast {generated}", fontsize=4, loc="right")
 
         return ax
 
-    rain_ax = sub_plot(1, "darkgray", weather.rain, rain_min, rain_max)
-    temp_ax = sub_plot(2, "lightgray", weather.temp, temp_min, temp_max)
+    rain_ax = sub_plot(1, "gray", weather.rain, rain_min, rain_max)
+    temp_ax = sub_plot(2, "silver", weather.temp, temp_min, temp_max)
 
-    rain_ax.set_ylabel(
-        r"$\frac{\text{mm}}{\text{hr}}$", rotation="horizontal", labelpad=8
-    )
+    rain_ax.set_ylabel("mm/hr", fontsize=7, labelpad=-1)
     rain_ax.yaxis.set_major_locator(MultipleLocator(5))
 
-    temp_ax.set_ylabel("°F", rotation="horizontal", labelpad=8)
+    temp_ax.set_ylabel("°F", fontsize=7, labelpad=-1)
     temp_ax.yaxis.set_major_locator(MultipleLocator(10))
 
     out = Path("plot.png")
@@ -195,19 +206,23 @@ def plot(
     return out
 
 
-def maybe_post(url: str | None, image: Path) -> None:
+def maybe_post(url: str | None, image_path: Path) -> None:
     if url is None:
         return
-    with image.open("rb") as f:
+    with Image.open(image_path) as image:
+        # Need to rotate for BYOD kindle 10th gen. TODO Is this true generally?
+        rotated_image = image.transpose(Image.Transpose.ROTATE_270)
+        buf = io.BytesIO()
+        rotated_image.save(buf, format="PNG")
+        rotated_image_bytes = buf.getvalue()
         response = requests.post(
             url=url,
             headers={
                 "Content-Type": "image/png",
             },
-            data=f,
+            data=rotated_image_bytes,
         )
     response.raise_for_status()
-
 
 
 def main():

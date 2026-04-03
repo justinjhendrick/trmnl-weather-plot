@@ -2,6 +2,7 @@ import io
 import argparse
 import datetime as dt
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from matplotlib.figure import Figure
@@ -112,8 +113,7 @@ def plot(
 ) -> Path:
     dpi = 200
     fig = Figure(figsize=(width / dpi, height / dpi), dpi=dpi, layout="compressed")
-    engine = fig.get_layout_engine()
-    engine.set(w_pad=0, h_pad=0, wspace=0, hspace=0)
+    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0, hspace=0)
     NUM_ROW = 2
     NUM_COL = 1
 
@@ -149,7 +149,7 @@ def plot(
                 )
             midnight += dt.timedelta(hours=24)
 
-        if idx == 1:  # on top
+        if idx == 1:
             # Weekdays at noons
             noon = (
                 weather.time[0]
@@ -160,10 +160,11 @@ def plot(
                 if noon >= weather.time[0]:
                     ax.text(
                         x=noon,  # ty: ignore[invalid-argument-type]
-                        y=lo - (hi - lo) * 0.08,
+                        y=hi,
                         s=noon.strftime("%a"),
+                        verticalalignment="top",
                         horizontalalignment="center",
-                        fontsize=9,
+                        fontsize=38,
                     )
                 noon += dt.timedelta(hours=24)
 
@@ -175,7 +176,7 @@ def plot(
             linewidth=0.5,
             color="black",
         )
-        ax.tick_params(axis="both", which="major", labelsize=7)
+        ax.tick_params(axis="both", which="major", labelsize=12, pad=0)
 
         if idx != NUM_ROW:
             # remove x axis for all but the bottom plot
@@ -184,7 +185,10 @@ def plot(
             )
         else:
             ax.xaxis.set_major_locator(HourLocator(byhour=[0, 6, 12, 18], tz=tz))
-            ax.xaxis.set_major_formatter(DateFormatter("%H", tz=tz))
+            if sys.platform.startswith("win"):
+                ax.xaxis.set_major_formatter(DateFormatter("%#H", tz=tz))
+            else:
+                ax.xaxis.set_major_formatter(DateFormatter("%-H", tz=tz))
 
             # TODO: find a spot for this. Was taking up too much space as an xlabel
             # generated = weather.generation_time.astimezone(tz=tz).strftime("%a %H:%M")
@@ -192,13 +196,13 @@ def plot(
 
         return ax
 
-    rain_ax = sub_plot(1, "gray", weather.rain, rain_min, rain_max)
-    temp_ax = sub_plot(2, "silver", weather.temp, temp_min, temp_max)
+    rain_ax = sub_plot(1, "#666666", weather.rain, rain_min, rain_max)
+    temp_ax = sub_plot(2, "#666666", weather.temp, temp_min, temp_max)
 
-    rain_ax.set_ylabel("mm/hr", fontsize=7, labelpad=-1)
+    rain_ax.set_ylabel("mm/hr", fontsize=8, labelpad=-1)
     rain_ax.yaxis.set_major_locator(MultipleLocator(5))
 
-    temp_ax.set_ylabel("°F", fontsize=7, labelpad=-1)
+    temp_ax.set_ylabel("°F", fontsize=8, labelpad=-1)
     temp_ax.yaxis.set_major_locator(MultipleLocator(10))
 
     out = Path("plot.png")

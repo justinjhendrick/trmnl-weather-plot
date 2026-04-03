@@ -1,0 +1,18 @@
+name: Send Image to TRMNL Server on a schedule
+
+on:
+  schedule:
+    # api.met.no seems to update on 16. Let's do 10 mins after for buffer
+    - cron: '26 * * * *'
+  workflow_dispatch:  # adds a run button we can press
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: [actions/checkout@v4](https://github.com)
+      - name: Install uv
+        uses: [astral-sh/setup-uv@v5](https://github.com/astral-sh/setup-uv)
+      - name: Generate and POST the Image
+        run: uv run main.py --user-agent "${{ github.server_url }}/${{ github.repository }}" --post-url "${{ secrets.TRMNL_WEBHOOK_POST_URL }}"

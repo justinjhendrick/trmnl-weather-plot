@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from matplotlib.figure import Figure
 from matplotlib.dates import DateFormatter, HourLocator
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MultipleLocator
 from zoneinfo import ZoneInfo
 
 import requests
@@ -51,7 +51,7 @@ class Weather:
 
 
 def f_from_c(c: float) -> float:
-    return 9 * c / 5 + 32.0
+    return 9.0 * c / 5.0 + 32.0
 
 
 def parse_weather(d: dict, duration: int) -> Weather:
@@ -82,7 +82,7 @@ def get_weather(
             return parse_weather(json.load(f), duration)
     assert user_agent is not None
     response = requests.get(
-        url="https://api.met.no/weatherapi/locationforecast/2.0/compact",
+        url="https://api.met.no/weatherapi/locationforecast/2.0/complete",
         headers={
             "user-agent": user_agent,
         },
@@ -108,7 +108,7 @@ def plot(
     height: int,
     tz: ZoneInfo,
 ) -> Path:
-    dpi = 167
+    dpi = 200
     fig = Figure(figsize=(width / dpi, height / dpi), dpi=dpi, layout="constrained")
     NUM_ROW = 2
     NUM_COL = 1
@@ -175,7 +175,7 @@ def plot(
             ax.xaxis.set_major_locator(HourLocator(byhour=[0, 6, 12, 18], tz=tz))
             ax.xaxis.set_major_formatter(DateFormatter("%H", tz=tz))
             generated = weather.generation_time.astimezone(tz=tz).strftime("%a %H:%M")
-            ax.set_xlabel(f"forecast {generated}", fontsize=4)
+            ax.set_xlabel(f"forecast {generated}", fontsize=4, loc="right")
 
         return ax
 
@@ -185,10 +185,10 @@ def plot(
     rain_ax.set_ylabel(
         r"$\frac{\text{mm}}{\text{hr}}$", rotation="horizontal", labelpad=8
     )
-    rain_ax.yaxis.set_major_locator(MaxNLocator(nbins=3))
+    rain_ax.yaxis.set_major_locator(MultipleLocator(5))
 
     temp_ax.set_ylabel("°F", rotation="horizontal", labelpad=8)
-    temp_ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+    temp_ax.yaxis.set_major_locator(MultipleLocator(10))
 
     out = Path("plot.png")
     fig.savefig(str(out), dpi=dpi)
@@ -198,7 +198,16 @@ def plot(
 def maybe_post(url: str | None, image: Path) -> None:
     if url is None:
         return
-    raise NotImplementedError()
+    with image.open("rb") as f:
+        response = requests.post(
+            url=url,
+            headers={
+                "Content-Type": "image/png",
+            },
+            data=f,
+        )
+    response.raise_for_status()
+
 
 
 def main():

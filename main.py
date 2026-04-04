@@ -158,13 +158,16 @@ def plot(
             )
             while noon <= weather.time[-1]:
                 if noon >= weather.time[0]:
+                    day_name = noon.strftime('%a').lower()
+                    day_number = str(noon.day)
                     ax.text(
                         x=noon,  # ty: ignore[invalid-argument-type]
                         y=hi,
-                        s=noon.strftime("%a"),
+                        s=r"$\text{" + day_name + r"}_" + day_number + "$",
                         verticalalignment="top",
                         horizontalalignment="center",
                         fontsize=38,
+                        clip_on=True,
                     )
                 noon += dt.timedelta(hours=24)
 

@@ -29,6 +29,8 @@ def handle_args() -> argparse.Namespace:
     return ap.parse_args()
 
 
+# TODO: move everything except user-agent and post-url to a config file.
+# TODO: including these temperature ranges
 SEATTLE_TEMPS = [
     (20, 70),  # jan
     (20, 70),  # feb
@@ -47,8 +49,7 @@ SEATTLE_TEMPS = [
 
 @dataclass
 class Weather:
-    generation_time: dt.datetime
-    time: list[dt.datetime]
+    time: list[dt.datetime]  # all times already converted to local time zone
     temp: list[float]  # F
     rain: list[float]  # mm/hour
 
@@ -57,19 +58,22 @@ def f_from_c(c: float) -> float:
     return 9.0 * c / 5.0 + 32.0
 
 
-def parse_weather(d: dict, duration: int) -> Weather:
+def parse_time(s: str, tz: ZoneInfo) -> dt.datetime:
+    return dt.datetime.fromisoformat(s).astimezone(tz)
+
+
+def parse_weather(d: dict, duration: int, tz: ZoneInfo) -> Weather:
     props = d["properties"]
     time = []
     temp = []
     rain = []
     for p in props["timeseries"]:
-        time.append(dt.datetime.fromisoformat(p["time"]))
+        time.append(parse_time(p["time"], tz))
         temp.append(f_from_c(float(p["data"]["instant"]["details"]["air_temperature"])))
         rain.append(float(p["data"]["next_1_hours"]["details"]["precipitation_amount"]))
         if len(time) > 2 and time[-1] - time[0] > dt.timedelta(hours=duration):
             break
     return Weather(
-        generation_time=dt.datetime.fromisoformat(props["meta"]["updated_at"]),
         time=time,
         temp=temp,
         rain=rain,
@@ -77,12 +81,16 @@ def parse_weather(d: dict, duration: int) -> Weather:
 
 
 def get_weather(
-    user_agent: str | None, duration: int, lat: float, lon: float
+    user_agent: str | None,
+    duration: int,
+    lat: float,
+    lon: float,
+    tz: ZoneInfo,
 ) -> Weather:
     cache_path = Path("example_weather.json")
     if user_agent is None:
         with cache_path.open() as f:
-            return parse_weather(json.load(f), duration)
+            return parse_weather(json.load(f), duration, tz)
     response = requests.get(
         url="https://api.met.no/weatherapi/locationforecast/2.0/complete",
         headers={
@@ -97,7 +105,7 @@ def get_weather(
     response_json = response.json()
     with cache_path.open("w") as f:
         json.dump(response_json, f)
-    return parse_weather(response_json, duration)
+    return parse_weather(response_json, duration, tz)
 
 
 def plot(
@@ -133,11 +141,7 @@ def plot(
         ax.spines["left"].set_visible(True)
 
         # vertical lines at midnights
-        midnight = (
-            weather.time[0]
-            .astimezone(tz=tz)
-            .replace(hour=0, minute=0, second=0, microsecond=0)
-        )
+        midnight = weather.time[0].replace(hour=0, minute=0, second=0, microsecond=0)
         while midnight <= weather.time[-1]:
             if midnight >= weather.time[0]:
                 ax.axvline(
@@ -150,11 +154,7 @@ def plot(
 
         if idx == 1:
             # Weekdays at noons
-            noon = (
-                weather.time[0]
-                .astimezone(tz=tz)
-                .replace(hour=12, minute=0, second=0, microsecond=0)
-            )
+            noon = weather.time[0].replace(hour=12, minute=0, second=0, microsecond=0)
             while noon <= weather.time[-1]:
                 if noon >= weather.time[0]:
                     day_name = noon.strftime("%a").lower()
@@ -192,10 +192,6 @@ def plot(
             else:
                 ax.xaxis.set_major_formatter(DateFormatter("%-H", tz=tz))
 
-            # TODO: find a spot for this. Was taking up too much space as an xlabel
-            # generated = weather.generation_time.astimezone(tz=tz).strftime("%a %H:%M")
-            # ax.set_xlabel(f"forecast {generated}", fontsize=4, loc="right")
-
         return ax
 
     rain_ax = sub_plot(1, "#666666", weather.rain, rain_min, rain_max)
@@ -216,7 +212,8 @@ def maybe_post(url: str | None, image_path: Path) -> None:
     if url is None:
         return
     with Image.open(image_path) as image:
-        # Need to rotate for BYOD kindle 10th gen. TODO Is this true generally?
+        # Need to rotate for BYOD kindle 10th gen.
+        # TODO: make rotation configurable. Not sure if needed for other devices
         rotated_image = image.transpose(Image.Transpose.ROTATE_270)
         buf = io.BytesIO()
         rotated_image.save(buf, format="PNG")
@@ -234,9 +231,14 @@ def maybe_post(url: str | None, image_path: Path) -> None:
 def main():
     args = handle_args()
     tz = ZoneInfo(args.time_zone)
-    weather = get_weather(args.user_agent, args.duration, args.lat, args.lon)
-    start = weather.time[0].astimezone(tz=tz)
-    temp_min, temp_max = SEATTLE_TEMPS[start.month]
+    weather = get_weather(
+        args.user_agent,
+        args.duration,
+        args.lat,
+        args.lon,
+        tz,
+    )
+    temp_min, temp_max = SEATTLE_TEMPS[weather.time[0].month]
     image_path = plot(
         weather,
         temp_min,

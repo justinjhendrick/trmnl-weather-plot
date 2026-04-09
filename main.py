@@ -79,11 +79,10 @@ def parse_weather(d: dict, duration: int) -> Weather:
 def get_weather(
     user_agent: str | None, duration: int, lat: float, lon: float
 ) -> Weather:
-    example_path = Path("example_weather.json")
-    if example_path.exists():
-        with example_path.open() as f:
+    cache_path = Path("example_weather.json")
+    if user_agent is None:
+        with cache_path.open() as f:
             return parse_weather(json.load(f), duration)
-    assert user_agent is not None
     response = requests.get(
         url="https://api.met.no/weatherapi/locationforecast/2.0/complete",
         headers={
@@ -96,7 +95,7 @@ def get_weather(
     )
     response.raise_for_status()
     response_json = response.json()
-    with example_path.open("w") as f:
+    with cache_path.open("w") as f:
         json.dump(response_json, f)
     return parse_weather(response_json, duration)
 
@@ -113,7 +112,7 @@ def plot(
 ) -> Path:
     dpi = 200
     fig = Figure(figsize=(width / dpi, height / dpi), dpi=dpi, layout="compressed")
-    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0, hspace=0)
+    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0, hspace=0)  # ty: ignore
     NUM_ROW = 2
     NUM_COL = 1
 
@@ -158,12 +157,12 @@ def plot(
             )
             while noon <= weather.time[-1]:
                 if noon >= weather.time[0]:
-                    day_name = noon.strftime('%a').lower()
+                    day_name = noon.strftime("%a").lower()
                     day_number = str(noon.day)
                     ax.text(
                         x=noon,  # ty: ignore[invalid-argument-type]
                         y=hi,
-                        s=r"$\text{" + day_name + r"}_" + day_number + "$",
+                        s=r"$\text{" + day_name + r"}_{" + day_number + "}$",
                         verticalalignment="top",
                         horizontalalignment="center",
                         fontsize=38,

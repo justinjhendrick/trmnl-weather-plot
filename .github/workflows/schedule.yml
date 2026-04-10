@@ -13,4 +13,4 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
-      - run: uv run main.py --user-agent "${{ github.server_url }}/${{ github.repository }}" --post-url "${{ secrets.TRMNL_WEBHOOK_POST_URL }}"
+      - run: uv run main.py --user-agent "${{ github.server_url }}/${{ github.repository }}" --post-url "${{ secrets.TRMNL_WEBHOOK_POST_URL }}" --config config.yaml

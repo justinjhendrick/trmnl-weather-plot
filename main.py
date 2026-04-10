@@ -12,39 +12,28 @@ from zoneinfo import ZoneInfo
 from PIL import Image
 
 import requests
+import yaml
 
 
 def handle_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--duration", type=int, default=48, help="hours")
-    ap.add_argument("--rain-min", type=float, default=0.0, help="mm/hr")
-    ap.add_argument("--rain-max", type=float, default=15.0, help="mm/hr")
-    ap.add_argument("--img-width", type=int, default=800, help="pixels")
-    ap.add_argument("--img-height", type=int, default=600, help="pixels")
-    ap.add_argument("--lat", type=float, default=47.6, help="decimal degrees")
-    ap.add_argument("--lon", type=float, default=-122.2, help="decimal degrees")
-    ap.add_argument("--time-zone", default="America/Los_Angeles", help="ZoneInfo")
-    ap.add_argument("--user-agent", help="identifying string for api.met.no")
-    ap.add_argument("--post-url", help="where to send the image")
+    ap.add_argument(
+        "--config",
+        required=True,
+        type=Path,
+        help="See seattle.yaml for an example",
+    )
+    ap.add_argument(
+        "--user-agent",
+        required=False,
+        help="identifying string for api.met.no",
+    )
+    ap.add_argument(
+        "--post-url",
+        required=False,
+        help="where to send the image",
+    )
     return ap.parse_args()
-
-
-# TODO: move everything except user-agent and post-url to a config file.
-# TODO: including these temperature ranges
-SEATTLE_TEMPS = [
-    (20, 70),  # jan
-    (20, 70),  # feb
-    (20, 70),  # mar
-    (30, 80),  # apr
-    (30, 80),  # may
-    (40, 90),  # jun
-    (40, 90),  # jul
-    (50, 100),  # aug
-    (40, 90),  # sep
-    (30, 80),  # oct
-    (20, 70),  # nov
-    (20, 70),  # dec
-]
 
 
 @dataclass
@@ -220,9 +209,7 @@ def maybe_post(url: str | None, image_path: Path) -> None:
         rotated_image_bytes = buf.getvalue()
         response = requests.post(
             url=url,
-            headers={
-                "Content-Type": "image/png",
-            },
+            headers={"Content-Type": "image/png"},
             data=rotated_image_bytes,
         )
     response.raise_for_status()
@@ -230,23 +217,26 @@ def maybe_post(url: str | None, image_path: Path) -> None:
 
 def main():
     args = handle_args()
-    tz = ZoneInfo(args.time_zone)
+    config = yaml.safe_load(args.config.read_text())
+    tz = ZoneInfo(config["time_zone"])
     weather = get_weather(
         args.user_agent,
-        args.duration,
-        args.lat,
-        args.lon,
+        config["duration"],
+        config["lat"],
+        config["lon"],
         tz,
     )
-    temp_min, temp_max = SEATTLE_TEMPS[weather.time[0].month]
+    this_month_idx = weather.time[0].month - 1
+    temp_min, temp_max = config["monthly_temp_limits"][this_month_idx]
+    rain_min, rain_max = config["monthly_rain_limits"][this_month_idx]
     image_path = plot(
         weather,
         temp_min,
         temp_max,
-        args.rain_min,
-        args.rain_max,
-        args.img_width,
-        args.img_height,
+        rain_min,
+        rain_max,
+        config["img_width"],
+        config["img_height"],
         tz,
     )
     maybe_post(args.post_url, image_path)

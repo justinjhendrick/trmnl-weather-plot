@@ -1,0 +1,34 @@
+duration: 48  # hours
+img_width: 800  # pixels
+img_height: 600  # pixels
+lat: 47.6  # decimal degrees
+lon: -122.2  # decimal degrees
+time_zone: America/Los_Angeles  # ZoneInfo
+
+monthly_temp_limits:
+ - [20,  70]  # jan
+ - [20,  70]  # feb
+ - [20,  70]  # mar
+ - [30,  80]  # apr
+ - [30,  80]  # may
+ - [40,  90]  # jun
+ - [40,  90]  # jul
+ - [50, 100]  # aug
+ - [40,  90]  # sep
+ - [30,  80]  # oct
+ - [20,  70]  # nov
+ - [20,  70]  # dec
+
+monthly_rain_limits:
+ - [0.0, 10.0]  # jan
+ - [0.0, 10.0]  # feb
+ - [0.0, 10.0]  # mar
+ - [0.0,  5.0]  # apr
+ - [0.0,  5.0]  # may
+ - [0.0,  5.0]  # jun
+ - [0.0,  5.0]  # jul
+ - [0.0,  5.0]  # aug
+ - [0.0,  5.0]  # sep
+ - [0.0, 10.0]  # oct
+ - [0.0, 10.0]  # nov
+ - [0.0, 10.0]  # dec

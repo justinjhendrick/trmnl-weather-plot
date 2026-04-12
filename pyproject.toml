@@ -17,3 +17,8 @@ dev = [
     "ruff>=0.15.8",
     "ty>=0.0.27",
 ]
+
+[tool.ruff.lint]
+extend-select = [
+    "I",
+]

@@ -1,18 +1,19 @@
-import io
 import argparse
 import datetime as dt
+import io
 import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from matplotlib.figure import Figure
-from matplotlib.dates import DateFormatter, HourLocator
-from matplotlib.ticker import MultipleLocator
+from typing import Any
 from zoneinfo import ZoneInfo
-from PIL import Image
 
 import requests
 import yaml
+from matplotlib.dates import DateFormatter, HourLocator
+from matplotlib.figure import Figure
+from matplotlib.ticker import MultipleLocator
+from PIL import Image
 
 
 def handle_args() -> argparse.Namespace:
@@ -113,7 +114,9 @@ def plot(
     NUM_ROW = 2
     NUM_COL = 1
 
-    def sub_plot(idx: int, color: str, data: list[float], lo: float, hi: float):
+    def sub_plot(
+        idx: int, color: str, data: list[float], lo: float, hi: float, **kwargs: Any
+    ):
         ax = fig.add_subplot(NUM_ROW, NUM_COL, idx)
         ax.set_ylim(lo, hi)
         ax.set_xlim(weather.time[0], weather.time[-1])  # ty: ignore[invalid-argument-type]
@@ -122,6 +125,7 @@ def plot(
             y1=lo,
             y2=data,
             color=color,
+            **kwargs,
         )
 
         ax.spines["top"].set_visible(False)
@@ -183,7 +187,7 @@ def plot(
 
         return ax
 
-    rain_ax = sub_plot(1, "#666666", weather.rain, rain_min, rain_max)
+    rain_ax = sub_plot(1, "#666666", weather.rain, rain_min, rain_max, step="post")
     temp_ax = sub_plot(2, "#666666", weather.temp, temp_min, temp_max)
 
     rain_ax.set_ylabel("mm/hr", fontsize=8, labelpad=-1)
